@@ -290,28 +290,6 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
     }
   }
 
-  public static<T> ArrowHostColumnVector fromLists(HostColumnVector.DataType dataType, List<T>... values) {
-    try (ArrowColumnBuilder cb = new ArrowColumnBuilder(dataType, values.length)) {
-      cb.appendLists(values);
-      return cb.build();
-    }
-  }
-
-  public static ArrowHostColumnVector fromStructs(HostColumnVector.DataType dataType,
-                                             List<StructData> values) {
-    try (ArrowColumnBuilder cb = new ArrowColumnBuilder(dataType, values.size())) {
-      cb.appendStructValues(values);
-      return cb.build();
-    }
-  }
-
-  public static ArrowHostColumnVector fromStructs(HostColumnVector.DataType dataType, StructData... values) {
-    try (ArrowColumnBuilder cb = new ArrowColumnBuilder(dataType, values.length)) {
-      cb.appendStructValues(values);
-      return cb.build();
-    }
-  }
-
   /**
    * Create a new vector from the given values.
    */
@@ -809,7 +787,7 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
 
     public void setOffsetBuf(HostMemoryBuffer hdata) {
 	// if (type.equals(DType.LIST) || type.equals(DType.STRING)) {
-            offset = hdata;
+            offsets = hdata;
 	// } else {
           //   throw new Exception("Error shouldn't be setting offset")
 	// }
