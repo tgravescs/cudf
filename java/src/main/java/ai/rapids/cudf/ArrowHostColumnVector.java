@@ -822,7 +822,8 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
     public final ColumnVector buildAndPutOnDevice() {
       try (ArrowHostColumnVector tmp = build()) {
 	// TODO - fix to handle arrow
-        return tmp.copyToDevice();
+	// Create an ArrowTable for this column, then call from_arrow and then get ColumnVector
+	return ColumnVector.fromArrow(data, valid, offsets)
       }
     }
 

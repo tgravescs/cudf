@@ -311,6 +311,11 @@ public final class ColumnVector extends ColumnView {
     return srcBuffer;
   }
 
+  public static ColumnVector fromArrow(HostMemoryBuffer data, HostMemoryBuffer validity, HostMemoryBuffer offsets) {
+    long columnHandle = fromArrow(data, validity, offsets);
+    return new ColumnVector(columnHandle);
+  }
+
   /**
    * Create a new vector of length rows, where each row is filled with the Scalar's
    * value
