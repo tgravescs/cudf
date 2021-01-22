@@ -188,7 +188,7 @@ public class HostMemoryBuffer extends MemoryBuffer {
     }
   }
 
-  HostMemoryBuffer(long address, long length) {
+  public HostMemoryBuffer(long address, long length) {
     this(address, length, new HostBufferCleaner(address, length));
   }
 
