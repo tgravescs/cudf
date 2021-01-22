@@ -319,8 +319,33 @@ public final class ColumnVector extends ColumnView {
       HostMemoryBuffer data,
       HostMemoryBuffer validity,
       HostMemoryBuffer offsets) {
+    /*
+    long offsetAddr = 0;
+    long offsetLength = 0;
+    log.warn("in from Arrow ColumnVector 15" + offsets);
+    if (offsets != null) {
+      log.warn("in from Arrow ColumnVector 16");
+      offsetAddr = offsets.getAddress();
+      offsetLength = offsets.getLength();
+    }
+    */
+    log.warn("in from Arrow ColumnVector 17" );
+    log.warn("in from Arrow ColumnVector 18 " + type.typeId.getNativeId() );
+    log.warn("in from Arrow ColumnVector 18 " + col_name);
+    log.warn("in from Arrow ColumnVector 18 " + col_length);
+    log.warn("in from Arrow ColumnVector 20" + null_count);
+    log.warn("in from Arrow ColumnVector 18 " + data.getAddress());
+    log.warn("in from Arrow ColumnVector 18 " + data.getLength());
+    log.warn("in from Arrow ColumnVector 22" + validity.getAddress());
+    log.warn("in from Arrow ColumnVector 18 " + validity.getLength());
     long columnHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data.getAddress(),
-        data.getLength(), validity.getAddress(), validity.getLength(), offsets.getAddress(), offsets.getLength());
+         data.getLength(), validity.getAddress(), validity.getLength());
+    log.warn("in from Arrow ColumnVector 19 colhandle: " + columnHandle);
+    if (columnHandle == 0) {
+      log.warn("in from Arrow ColumnVector 20 handle is 0");
+      // throw new RuntimeException("failure");
+    }
+      log.warn("in from Arrow ColumnVector 21 handle is " + columnHandle);
     return new ColumnVector(columnHandle);
   }
 
@@ -555,7 +580,7 @@ public final class ColumnVector extends ColumnView {
 
   private static native long sequence(long initialValue, long step, int rows);
 
-  private static native long fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size, long offsets, long offsets_size) throws CudfException;
+  private static native long fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size) throws CudfException;
 
   private static native long fromScalar(long scalarHandle, int rowCount) throws CudfException;
 

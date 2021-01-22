@@ -63,6 +63,9 @@ convert_table_for_return(JNIEnv *env, std::unique_ptr<cudf::table> &table_result
   std::vector<std::unique_ptr<cudf::column>> ret = table_result->release();
   int num_columns = ret.size();
   // TODO - make sure only 1 column
+  if (num_columns != 1) {
+    return 5;
+  }
   return reinterpret_cast<jlong>(ret[0].release());
 }
 
@@ -74,11 +77,9 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
                                                                     jlong j_data,
                                                                     jlong j_data_size,
                                                                     jlong j_validity,
-                                                                    jlong j_validity_size,
-                                                                    jlong j_offsets,
-                                                                    jlong j_offsets_size) {
-  JNI_NULL_CHECK(env, j_data, "data is null", 0);
-  JNI_NULL_CHECK(env, j_validity, "validity is null", 0);
+                                                                    jlong j_validity_size) {
+  // JNI_NULL_CHECK(env, j_data, "data is null", 0);
+  // JNI_NULL_CHECK(env, j_validity, "validity is null", 0);
   try {
     cudf::jni::auto_set_device(env);
 
@@ -100,6 +101,7 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
       case cudf::type_id::INT32:
         // return std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count)
         arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
+	break;
       default: CUDF_FAIL("Unsupported type_id conversion to arrow");
     }
 
@@ -115,6 +117,23 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
     std::vector<std::shared_ptr<arrow::Field>> fields = {f0};
     std::shared_ptr<arrow::Schema> schema = std::make_shared<arrow::Schema>(fields);
     auto arrow_table = arrow::Table::Make(schema, std::vector<std::shared_ptr<arrow::Array>>{arrow_array});
+    if (arrow_table->num_rows() != j_col_length) {
+      return 4;
+    }
+    if (arrow_table->num_columns() != 1) {
+      return 5;
+    }
+    auto col = arrow_table->column(0);
+    std::vector<int32_t> original_data{23, 40, 20, 33, 41, 39, 24, 24, 44, 45, 41, 45, 21, 32,29,25,26,47, 29, 35};
+    auto arr = std::make_shared<arrow::Int32Array>(7, arrow::Buffer::Wrap(original_data));
+    auto chunked_arr = new arrow::ChunkedArray(arr);
+    for (int i = 0; i < col->num_chunks(); ++i) {
+      auto c1 = col->chunk(i);
+      auto c2 = chunked_arr->chunk(i);
+      if (! c1->Equals(c2)) {
+	      return 20;
+      }
+    }
 
     auto got_cudf_table = cudf::from_arrow(*arrow_table);
     return convert_table_for_return(env, got_cudf_table);

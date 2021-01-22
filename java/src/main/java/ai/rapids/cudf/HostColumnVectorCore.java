@@ -45,7 +45,8 @@ public class HostColumnVectorCore implements AutoCloseable {
   public HostColumnVectorCore(DType type, long rows,
                               Optional<Long> nullCount, HostMemoryBuffer data, HostMemoryBuffer validity,
                               HostMemoryBuffer offsets, List<HostColumnVectorCore> nestedChildren) {
-    this.offHeap = new OffHeapState(data, validity,  offsets);
+    log.warn("in HostColumnVectorCore create");
+    this.offHeap = new OffHeapState(data, validity, offsets);
     MemoryCleaner.register(this, offHeap);
     this.type = type;
     this.rows = rows;
@@ -557,9 +558,15 @@ public class HostColumnVectorCore implements AutoCloseable {
       boolean neededCleanup = false;
       if (data != null || valid != null || offsets != null) {
         try {
-          ColumnVector.closeBuffers(data);
-          ColumnVector.closeBuffers(offsets);
-          ColumnVector.closeBuffers(valid);
+	  if (data != null) {
+            ColumnVector.closeBuffers(data);
+	  }
+	  if (offsets != null) {
+            ColumnVector.closeBuffers(offsets);
+	  }
+	  if (valid != null) {
+            ColumnVector.closeBuffers(valid);
+	  }
         } finally {
           // Always mark the resource as freed even if an exception is thrown.
           // We cannot know how far it progressed before the exception, and

@@ -18,6 +18,9 @@
 
 package ai.rapids.cudf;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -38,6 +41,7 @@ import java.util.function.Consumer;
  * and call incRefCount to increment the reference count.
  */
 public final class ArrowHostColumnVector extends HostColumnVectorCore {
+  private static final Logger log = LoggerFactory.getLogger(ArrowHostColumnVector.class);
   /**
    * The size in bytes of an offset entry
    */
@@ -750,6 +754,7 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
    */
 
   public static final class ArrowColumnBuilder implements AutoCloseable {
+    private static final Logger log = LoggerFactory.getLogger(ArrowColumnBuilder.class);
 
     private DType type;
     private HostMemoryBuffer data;
@@ -773,7 +778,9 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
       this.nullable = type.isNullable();
       this.colName = name;
       this.rows = 0;
+      this.offsets = null;
       // TODO - rename estimatedRows to actual unless we do row count
+      log.warn("in ArrowColVec colname is: " + name);
       this.estimatedRows = estimatedRows;
       for (int i = 0; i < type.getNumChildren(); i++) {
         childBuilders.add(new ArrowColumnBuilder(type.getChild(i), estimatedRows, name));
@@ -797,9 +804,14 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
     }
 
     public ArrowHostColumnVector build() {
+      log.warn("in Build ArrowColVec");
       List<HostColumnVectorCore> hostColumnVectorCoreList = new ArrayList<>();
       for (ArrowColumnBuilder childBuilder : childBuilders) {
         hostColumnVectorCoreList.add(childBuilder.buildNestedInternal());
+      }
+      log.warn("in Build ArrowColVec ArrowHostColumnVector");
+      if (offsets == null) {
+        log.warn("offsets is null 1");
       }
       ArrowHostColumnVector hostColumnVector = new ArrowHostColumnVector(type, rows, Optional.of(nullCount), data, valid, offsets,
           hostColumnVectorCoreList);
@@ -823,6 +835,8 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
      * Finish and create the immutable ColumnVector, copied to the device.
      */
     public final ColumnVector buildAndPutOnDevice() {
+      log.warn("in buildAndPutOnDevice ArrowColVec");
+
       try (ArrowHostColumnVector tmp = build()) {
 	// TODO - fix to handle arrow
 	// Create an ArrowTable for this column, then call from_arrow and then get ColumnVector
@@ -839,6 +853,10 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
       int offsets_size)
 */
 	// TODO - FIGURE OUT ROWS?
+	log.warn("in buildAndPutOnDevice ArrowColVec");
+        if (offsets == null) {
+          log.warn("offsets is null 2");
+        }
 	return ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, valid, offsets);
       }
     }
