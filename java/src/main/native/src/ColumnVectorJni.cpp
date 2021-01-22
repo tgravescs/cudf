@@ -18,12 +18,14 @@
 #include <cudf/column/column_factories.hpp>
 #include <cudf/concatenate.hpp>
 #include <cudf/filling.hpp>
+#include <cudf/interop.hpp>
 #include <cudf/hashing.hpp>
 #include <cudf/utilities/bit.hpp>
 #include <cudf/lists/detail/concatenate.hpp>
 #include <cudf/lists/lists_column_view.hpp>
 #include <cudf/structs/structs_column_view.hpp>
 
+#include "arrow_conversion.hpp"
 #include "cudf_jni_apis.hpp"
 #include "dtype_utils.hpp"
 
@@ -49,52 +51,6 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_sequence(JNIEnv *env, j
   CATCH_STD(env, 0);
 }
 
-template <typename... Ts>
-std::shared_ptr<arrow::Array> to_arrow_array(cudf::type_id id, Ts&&... args)
-{
-  switch (id) {
-    case type_id::BOOL8:
-      return std::make_shared<arrow::BooleanArray>(std::forward<Ts>(args)...);
-    case type_id::INT8: return std::make_shared<arrow::Int8Array>(std::forward<Ts>(args)...);
-    case type_id::INT16: return std::make_shared<arrow::Int16Array>(std::forward<Ts>(args)...);
-    case type_id::INT32: return std::make_shared<arrow::Int32Array>(std::forward<Ts>(args)...);
-    case type_id::INT64: return std::make_shared<arrow::Int64Array>(std::forward<Ts>(args)...);
-    case type_id::UINT8: return std::make_shared<arrow::UInt8Array>(std::forward<Ts>(args)...);
-    case type_id::UINT16: return std::make_shared<arrow::UInt16Array>(std::forward<Ts>(args)...);
-    case type_id::UINT32: return std::make_shared<arrow::UInt32Array>(std::forward<Ts>(args)...);
-    case type_id::UINT64: return std::make_shared<arrow::UInt64Array>(std::forward<Ts>(args)...);
-    case type_id::FLOAT32: return std::make_shared<arrow::FloatArray>(std::forward<Ts>(args)...);
-    case type_id::FLOAT64: return std::make_shared<arrow::DoubleArray>(std::forward<Ts>(args)...);
-    case type_id::TIMESTAMP_DAYS:
-      return std::make_shared<arrow::Date32Array>(std::make_shared<arrow::Date32Type>(),
-                                                  std::forward<Ts>(args)...);
-    case type_id::TIMESTAMP_SECONDS:
-      return std::make_shared<arrow::TimestampArray>(arrow::timestamp(arrow::TimeUnit::SECOND),
-                                                     std::forward<Ts>(args)...);
-    case type_id::TIMESTAMP_MILLISECONDS:
-      return std::make_shared<arrow::TimestampArray>(arrow::timestamp(arrow::TimeUnit::MILLI),
-                                                     std::forward<Ts>(args)...);
-    case type_id::TIMESTAMP_MICROSECONDS:
-      return std::make_shared<arrow::TimestampArray>(arrow::timestamp(arrow::TimeUnit::MICRO),
-                                                     std::forward<Ts>(args)...);
-    case type_id::TIMESTAMP_NANOSECONDS:
-      return std::make_shared<arrow::TimestampArray>(arrow::timestamp(arrow::TimeUnit::NANO),
-                                                     std::forward<Ts>(args)...);
-    case type_id::DURATION_SECONDS:
-      return std::make_shared<arrow::DurationArray>(arrow::duration(arrow::TimeUnit::SECOND),
-                                                    std::forward<Ts>(args)...);
-    case type_id::DURATION_MILLISECONDS:
-      return std::make_shared<arrow::DurationArray>(arrow::duration(arrow::TimeUnit::MILLI),
-                                                    std::forward<Ts>(args)...);
-    case type_id::DURATION_MICROSECONDS:
-      return std::make_shared<arrow::DurationArray>(arrow::duration(arrow::TimeUnit::MICRO),
-                                                    std::forward<Ts>(args)...);
-    case type_id::DURATION_NANOSECONDS:
-      return std::make_shared<arrow::DurationArray>(arrow::duration(arrow::TimeUnit::NANO),
-                                                    std::forward<Ts>(args)...);
-    default: CUDF_FAIL("Unsupported type_id conversion to arrow");
-  }
-}
 
 /**
  * Take a table returned by some operation and turn it into an array of column* so we can track them
@@ -113,12 +69,12 @@ convert_table_for_return(JNIEnv *env, std::unique_ptr<cudf::table> &table_result
 JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, jclass,
                                                                     jint j_type,
 								    jstring j_col_name,
-								    jint j_col_length,
-								    jint j_null_count,
+								    jlong j_col_length,
+								    jlong j_null_count,
                                                                     jlong j_data,
-                                                                    jint j_data_size,
+                                                                    jlong j_data_size,
                                                                     jlong j_validity,
-                                                                    jint j_validity_size,
+                                                                    jlong j_validity_size,
                                                                     jlong j_offsets,
                                                                     jlong j_offsets_size) {
   JNI_NULL_CHECK(env, j_data, "data is null", 0);
@@ -128,8 +84,9 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
 
     cudf::type_id n_type = static_cast<cudf::type_id>(j_type);
 
-    auto null_buffer = Buffer::Wrap(j_validity, j_validity_size);
-    auto data_buffer = Buffer::Wrap(j_data, j_data_size);
+    // is char* ok here?
+    auto null_buffer = arrow::Buffer::Wrap(reinterpret_cast<const char *>(j_validity), static_cast<int>(j_validity_size));
+    auto data_buffer = arrow::Buffer::Wrap(reinterpret_cast<const char *>(j_data), static_cast<int>(j_data_size));
     // TODO - offset buffer if not null
 	    // bool
 	    // string_view
@@ -140,9 +97,9 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
     
     std::shared_ptr<arrow::Array> arrow_array;
     switch (n_type) {
-      case type_id::INT32:
+      case cudf::type_id::INT32:
         // return std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count)
-        arrow_array = to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
+        arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
       default: CUDF_FAIL("Unsupported type_id conversion to arrow");
     }
 
@@ -153,14 +110,14 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
     // auto arrow_array = std::make_shared<ExtensionArray>(arrow_data);
     
     cudf::jni::native_jstring col_name(env, j_col_name);
-    auto struct_meta = cudf::column_metadata{col_name};
-    auto f0 = arrow::field(struct_meta.name, arrow_array->type())
-    std::vector<std::shared_ptr<Field>> fields = {f0};
-    std::shared_ptr<Schema> schema = std::make_shared<Schema>(fields);
-    auto arrow_table = arrow::Table::Make(schema, arrow_array);
+    auto struct_meta = cudf::column_metadata{col_name.get()};
+    auto f0 = arrow::field(struct_meta.name, arrow_array->type());
+    std::vector<std::shared_ptr<arrow::Field>> fields = {f0};
+    std::shared_ptr<arrow::Schema> schema = std::make_shared<arrow::Schema>(fields);
+    auto arrow_table = arrow::Table::Make(schema, std::vector<std::shared_ptr<arrow::Array>>{arrow_array});
 
-    auto got_cudf_table = cudf::from_arrow(arrow_table)
-    return convert_table_for_return(got_cudf_table)
+    auto got_cudf_table = cudf::from_arrow(*arrow_table);
+    return convert_table_for_return(env, got_cudf_table);
   }
   CATCH_STD(env, 0);
 }

@@ -760,6 +760,7 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
     private boolean nullable;
     private long rows;
     private long estimatedRows;
+    private String colName;
     private boolean built = false;
     private List<ArrowColumnBuilder> childBuilders = new ArrayList<>();
 
@@ -767,13 +768,15 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
     private int currentByteIndex = 0;
 
 
-    public ArrowColumnBuilder(HostColumnVector.DataType type, long estimatedRows) {
+    public ArrowColumnBuilder(HostColumnVector.DataType type, long estimatedRows, String name) {
       this.type = type.getType();
       this.nullable = type.isNullable();
+      this.colName = name;
       this.rows = 0;
+      // TODO - rename estimatedRows to actual unless we do row count
       this.estimatedRows = estimatedRows;
       for (int i = 0; i < type.getNumChildren(); i++) {
-        childBuilders.add(new ArrowColumnBuilder(type.getChild(i), estimatedRows));
+        childBuilders.add(new ArrowColumnBuilder(type.getChild(i), estimatedRows, name));
       }
     }
 
@@ -823,7 +826,20 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
       try (ArrowHostColumnVector tmp = build()) {
 	// TODO - fix to handle arrow
 	// Create an ArrowTable for this column, then call from_arrow and then get ColumnVector
-	return ColumnVector.fromArrow(data, valid, offsets)
+/*
+  int type,
+      String col_name,
+      int col_length,
+      int null_count,
+      HostMemoryBuffer data,
+      int data_size,
+      HostMemoryBuffer validity,
+      int validity_size,
+      HostMemoryBuffer offsets
+      int offsets_size)
+*/
+	// TODO - FIGURE OUT ROWS?
+	return ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, valid, offsets);
       }
     }
 

@@ -311,8 +311,16 @@ public final class ColumnVector extends ColumnView {
     return srcBuffer;
   }
 
-  public static ColumnVector fromArrow(HostMemoryBuffer data, HostMemoryBuffer validity, HostMemoryBuffer offsets) {
-    long columnHandle = fromArrow(data, validity, offsets);
+  public static ColumnVector fromArrow(
+      DType type, 
+      String col_name,
+      long col_length,
+      long null_count,
+      HostMemoryBuffer data,
+      HostMemoryBuffer validity,
+      HostMemoryBuffer offsets) {
+    long columnHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data.getAddress(),
+        data.getLength(), validity.getAddress(), validity.getLength(), offsets.getAddress(), offsets.getLength());
     return new ColumnVector(columnHandle);
   }
 
@@ -546,6 +554,8 @@ public final class ColumnVector extends ColumnView {
   /////////////////////////////////////////////////////////////////////////////
 
   private static native long sequence(long initialValue, long step, int rows);
+
+  private static native long fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size, long offsets, long offsets_size) throws CudfException;
 
   private static native long fromScalar(long scalarHandle, int rowCount) throws CudfException;
 
