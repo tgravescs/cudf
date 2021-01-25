@@ -52,24 +52,8 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_sequence(JNIEnv *env, j
 }
 
 
-/**
- * Take a table returned by some operation and turn it into an array of column* so we can track them
- * ourselves in java instead of having their life tied to the table.
- * @param table_result the table to convert for return
- * @param extra_columns columns not in the table that will be added to the result at the end.
- */
-static jlong
-convert_table_for_return(JNIEnv *env, std::unique_ptr<cudf::table> &table_result) {
-  std::vector<std::unique_ptr<cudf::column>> ret = table_result->release();
-  int num_columns = ret.size();
-  // TODO - make sure only 1 column
-  if (num_columns != 1) {
-    return 5;
-  }
-  return reinterpret_cast<jlong>(ret[0].release());
-}
 
-JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, jclass,
+JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, jclass,
                                                                     jint j_type,
 								    jstring j_col_name,
 								    jlong j_col_length,
@@ -100,7 +84,11 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
     switch (n_type) {
       case cudf::type_id::INT32:
         // return std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count)
-        arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
+        // arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
+	// arrow_array = std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count);
+	//
+	// TODO - pass in true number of elements for length
+	arrow_array = std::make_shared<arrow::Int32Array>(20, data_buffer, null_buffer, 0);
 	break;
       default: CUDF_FAIL("Unsupported type_id conversion to arrow");
     }
@@ -117,26 +105,75 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
     std::vector<std::shared_ptr<arrow::Field>> fields = {f0};
     std::shared_ptr<arrow::Schema> schema = std::make_shared<arrow::Schema>(fields);
     auto arrow_table = arrow::Table::Make(schema, std::vector<std::shared_ptr<arrow::Array>>{arrow_array});
+    cudf::jni::native_jlongArray outcol_handles(env, 1);
     if (arrow_table->num_rows() != j_col_length) {
-      return 4;
+      long retVal = 4;
+      outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+      return outcol_handles.get_jArray();
     }
     if (arrow_table->num_columns() != 1) {
-      return 5;
+      long retVal = 5;
+      outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+      return outcol_handles.get_jArray();
     }
     auto col = arrow_table->column(0);
     std::vector<int32_t> original_data{23, 40, 20, 33, 41, 39, 24, 24, 44, 45, 41, 45, 21, 32,29,25,26,47, 29, 35};
-    auto arr = std::make_shared<arrow::Int32Array>(7, arrow::Buffer::Wrap(original_data));
+    auto arr = std::make_shared<arrow::Int32Array>(20, arrow::Buffer::Wrap(original_data));
+    if (arr->length() != 20) {
+      long retVal = 27;
+      outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+      return outcol_handles.get_jArray();
+    }
+    const int32_t* data = arr->data()->GetValues<int32_t>(1);
+    if (data[0] != 23) {
+      long retVal = 26;
+      outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+      return outcol_handles.get_jArray();
+    }
     auto chunked_arr = new arrow::ChunkedArray(arr);
     for (int i = 0; i < col->num_chunks(); ++i) {
       auto c1 = col->chunk(i);
       auto c2 = chunked_arr->chunk(i);
+      if (c1->length() != c2->length()) {
+        long retVal = 30;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
+      }
+      if (!c1->type()->Equals(c2->type())) {
+        long retVal = 31;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
+      }
+
       if (! c1->Equals(c2)) {
-	      return 20;
+        long retVal = 20;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
+      }
+      auto c1data = c1->data()->GetValues<int32_t>(1);
+      if (c1data[0] != 23) {
+        long retVal = 40;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
       }
     }
 
-    auto got_cudf_table = cudf::from_arrow(*arrow_table);
-    return convert_table_for_return(env, got_cudf_table);
+    // auto got_cudf_table = cudf::from_arrow(*arrow_table);
+        std::unique_ptr<cudf::table> result = cudf::from_arrow(*(arrow_table));
+	return cudf::jni::convert_table_for_return(env, result);
+    /*
+    std::vector<std::unique_ptr<cudf::column>> ret = got_cudf_table->release();
+    int num_columns = ret.size();
+    // TODO - make sure only 1 column
+    if (num_columns != 1) {
+      return 5;
+    }
+
+    cudf::column* retCol = ret[0].release();
+    if (retCol-> 
+    return reinterpret_cast<jlong>(retCol);
+    */
+    // return cudf::jni::convert_table_for_return(env, got_cudf_table);
   }
   CATCH_STD(env, 0);
 }

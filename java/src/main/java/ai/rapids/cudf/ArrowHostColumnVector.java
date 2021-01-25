@@ -111,14 +111,21 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
    */
   @Override
   public synchronized void close() {
+     log.warn("in close 3");
     refCount--;
     offHeap.delRef();
+     log.warn("in close 5");
     if (refCount == 0) {
-      offHeap.clean(false);
+      log.warn("in close 4");
+      // TODO - can't close here because owned by arrowcolumnvector
+      // offHeap.clean(false);
+      log.warn("in close 8");
       for( HostColumnVectorCore child : children) {
+        log.warn("in close 6");
         child.close();
       }
     } else if (refCount < 0) {
+        log.warn("in close 7");
       offHeap.logRefCountDebug("double free " + this);
       throw new IllegalStateException("Close called too many times " + this);
     }
@@ -853,16 +860,22 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
       int offsets_size)
 */
 	// TODO - FIGURE OUT ROWS?
-	log.warn("in buildAndPutOnDevice ArrowColVec");
+	log.warn("in buildAndPutOnDevice ArrowColVec 2");
         if (offsets == null) {
           log.warn("offsets is null 2");
         }
-	return ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, valid, offsets);
+	log.warn("type before is: " + type + " name is: " + colName);
+        ColumnVector vecRet = ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, valid, offsets);
+        log.warn("got vec to return type: " + vecRet.getType() + " lenght " + vecRet.getRowCount() + " is int: ");
+	log.warn("back from fromArrow:" + vecRet.toString());
+	
+        return vecRet;
       }
     }
 
     @Override
     public void close() {
+      log.warn("in close 2");
       if (!built) {
         if (data != null) {
           data.close();
@@ -1420,6 +1433,7 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
      * Finish and create the immutable ColumnVector, copied to the device.
      */
     public final ColumnVector buildAndPutOnDevice() {
+      log.warn("in buildAndPutOnDevice BUILDER - hsouldn't");
       try (ArrowHostColumnVector tmp = build()) {
         return tmp.copyToDevice();
       }
@@ -1431,6 +1445,7 @@ public final class ArrowHostColumnVector extends HostColumnVectorCore {
      */
     @Override
     public final void close() {
+      log.warn("in close");
       if (!built) {
         data.close();
         data = null;

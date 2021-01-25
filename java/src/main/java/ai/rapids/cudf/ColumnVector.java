@@ -56,10 +56,14 @@ public final class ColumnVector extends ColumnView {
    */
   public ColumnVector(long nativePointer) {
     super(getColumnViewFromColumn(nativePointer));
+    log.warn("in create volumn view before native");
     assert nativePointer != 0;
     offHeap = new OffHeapState(nativePointer);
+    log.warn("in create volumn view offheap");
     MemoryCleaner.register(this, offHeap);
+    log.warn("in create volumn cleaner ");
     this.refCount = 0;
+    log.warn("in create volumn refcount");
     incRefCountInternal(true);
   }
 
@@ -338,15 +342,18 @@ public final class ColumnVector extends ColumnView {
     log.warn("in from Arrow ColumnVector 18 " + data.getLength());
     log.warn("in from Arrow ColumnVector 22" + validity.getAddress());
     log.warn("in from Arrow ColumnVector 18 " + validity.getLength());
-    long columnHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data.getAddress(),
+    long[] retColHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data.getAddress(),
          data.getLength(), validity.getAddress(), validity.getLength());
+    long columnHandle = retColHandle[0];
     log.warn("in from Arrow ColumnVector 19 colhandle: " + columnHandle);
     if (columnHandle == 0) {
       log.warn("in from Arrow ColumnVector 20 handle is 0");
       // throw new RuntimeException("failure");
     }
-      log.warn("in from Arrow ColumnVector 21 handle is " + columnHandle);
-    return new ColumnVector(columnHandle);
+    log.warn("in from Arrow ColumnVector 21 handle is " + columnHandle);
+    ColumnVector vec = new ColumnVector(columnHandle);
+    log.warn("got vec from handle, returning " + vec.toString());
+    return vec;
   }
 
   /**
@@ -580,7 +587,9 @@ public final class ColumnVector extends ColumnView {
 
   private static native long sequence(long initialValue, long step, int rows);
 
-  private static native long fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size) throws CudfException;
+  private static native long[] fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size) throws CudfException;
+
+  private static native long[] convertArrowTableToCudf(long arrowHandle);
 
   private static native long fromScalar(long scalarHandle, int rowCount) throws CudfException;
 
