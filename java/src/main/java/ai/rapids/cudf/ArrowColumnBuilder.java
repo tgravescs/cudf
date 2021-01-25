@@ -41,9 +41,12 @@ public final class ArrowColumnBuilder implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(ArrowColumnBuilder.class);
 
     private DType type;
-    private HostMemoryBuffer data;
-    private HostMemoryBuffer valid;
-    private HostMemoryBuffer offsets;
+    private long data;
+    private long dataLength;
+    private long validity;
+    private long validityLength;
+    private long offsets;
+    private long offsetsLength;
     private long nullCount = 0l;
     //TODO nullable currently not used
     private boolean nullable;
@@ -62,7 +65,8 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       this.nullable = type.isNullable();
       this.colName = name;
       this.rows = 0;
-      this.offsets = null;
+      this.offsets = 0;
+      this.offsetsLength = 0;
       // TODO - rename estimatedRows to actual unless we do row count
       log.warn("in ArrowColVec colname is: " + name);
       this.estimatedRows = estimatedRows;
@@ -71,17 +75,20 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       }
     }
 
-    public void setDataBuf(HostMemoryBuffer hdata) {
-      data = hdata;
+    public void setDataBuf(long hdata, long length) {
+      this.data = hdata;
+      this.dataLength = length;
     }
 
-    public void setValidityBuf(HostMemoryBuffer hdata) {
-      valid = hdata;
+    public void setValidityBuf(long valid, long length) {
+      this.validity = valid;
+      this.validityLength = length;
     }
 
-    public void setOffsetBuf(HostMemoryBuffer hdata) {
+    public void setOffsetBuf(long offsets, long length) {
+      this.offsets = offsets;
+      this.offsetsLength= length;
 	// if (type.equals(DType.LIST) || type.equals(DType.STRING)) {
-            offsets = hdata;
 	// } else {
           //   throw new Exception("Error shouldn't be setting offset")
 	// }
@@ -98,28 +105,13 @@ public final class ArrowColumnBuilder implements AutoCloseable {
     public final ColumnVector buildAndPutOnDevice() {
       log.warn("in buildAndPutOnDevice ArrowColVec");
 
-      // try (ArrowHostColumnVector tmp = build()) {
-	// TODO - fix to handle arrow
-	// Create an ArrowTable for this column, then call from_arrow and then get ColumnVector
-/*
-  int type,
-      String col_name,
-      int col_length,
-      int null_count,
-      HostMemoryBuffer data,
-      int data_size,
-      HostMemoryBuffer validity,
-      int validity_size,
-      HostMemoryBuffer offsets
-      int offsets_size)
-*/
 	// TODO - FIGURE OUT ROWS?
 	log.warn("in buildAndPutOnDevice ArrowColVec 2");
-        if (offsets == null) {
+        if (offsets == 0) {
           log.warn("offsets is null 2");
         }
 	log.warn("type before is: " + type + " name is: " + colName);
-        ColumnVector vecRet = ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, valid, offsets);
+        ColumnVector vecRet = ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, dataLength, validity, validityLength, offsets, offsetsLength);
         log.warn("got vec to return type: " + vecRet.getType() + " lenght " + vecRet.getRowCount() + " is int: ");
 	log.warn("back from fromArrow:" + vecRet.toString());
 	
@@ -131,26 +123,6 @@ public final class ArrowColumnBuilder implements AutoCloseable {
     public void close() {
       // memory buffers owned outside of this
       log.warn("in close 2 - do nothing");
-      /*
-      if (!built) {
-        if (data != null) {
-          data.close();
-          data = null;
-        }
-        if (valid != null) {
-          valid.close();
-          valid = null;
-        }
-        if (offsets != null) {
-          offsets.close();
-          offsets = null;
-        }
-        for (ArrowColumnBuilder childBuilder : childBuilders) {
-          childBuilder.close();
-        }
-        built = true;
-      }
-      */
     }
 
     @Override
@@ -163,7 +135,11 @@ public final class ArrowColumnBuilder implements AutoCloseable {
           "type=" + type +
           ", children=" + sj.toString() +
           ", data=" + data +
-          ", valid=" + valid +
+          ", dataLength=" + dataLength +
+          ", validity=" + validity +
+          ", validityLength=" + validityLength +
+          ", offsets=" + offsets +
+          ", offsetsLength=" + offsetsLength+
           ", currentIndex=" + currentIndex +
           ", nullCount=" + nullCount +
           ", estimatedRows=" + estimatedRows +

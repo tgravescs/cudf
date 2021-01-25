@@ -321,9 +321,12 @@ public final class ColumnVector extends ColumnView {
       String col_name,
       long col_length,
       long null_count,
-      HostMemoryBuffer data,
-      HostMemoryBuffer validity,
-      HostMemoryBuffer offsets) {
+      long data,
+      long dataLength,
+      long validity,
+      long validityLength,
+      long offsets,
+      long offsetsLength) {
     /*
     long offsetAddr = 0;
     long offsetLength = 0;
@@ -334,17 +337,8 @@ public final class ColumnVector extends ColumnView {
       offsetLength = offsets.getLength();
     }
     */
-    log.warn("in from Arrow ColumnVector 17" );
-    log.warn("in from Arrow ColumnVector 18 " + type.typeId.getNativeId() );
-    log.warn("in from Arrow ColumnVector 18 " + col_name);
-    log.warn("in from Arrow ColumnVector 18 " + col_length);
-    log.warn("in from Arrow ColumnVector 20" + null_count);
-    log.warn("in from Arrow ColumnVector 18 " + data.getAddress());
-    log.warn("in from Arrow ColumnVector 18 " + data.getLength());
-    log.warn("in from Arrow ColumnVector 22" + validity.getAddress());
-    log.warn("in from Arrow ColumnVector 18 " + validity.getLength());
-    long[] retColHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data.getAddress(),
-         data.getLength(), validity.getAddress(), validity.getLength());
+    long[] retColHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data,
+         dataLength, validity, validityLength);
     long columnHandle = retColHandle[0];
     log.warn("in from Arrow ColumnVector 19 colhandle: " + columnHandle);
     if (columnHandle == 0) {
