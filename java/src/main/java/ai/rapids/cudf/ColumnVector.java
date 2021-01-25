@@ -202,6 +202,7 @@ public final class ColumnVector extends ColumnView {
    */
   @Override
   public synchronized void close() {
+    log.warn("in close ColumnVEctor");
     refCount--;
     offHeap.delRef();
     if (refCount == 0) {
@@ -619,9 +620,12 @@ public final class ColumnVector extends ColumnView {
    * be aggregated into a single exception thrown at the end.
    */
   static void closeBuffers(AutoCloseable buffer) {
+    log.warn("in close buffer auto");
     Throwable toThrow = null;
     if (buffer != null) {
+      log.warn("in close buffer auto 2");
       try {
+        log.warn("in close buffer auto 3");
         buffer.close();
       } catch (Throwable t) {
         toThrow = t;
