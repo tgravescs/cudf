@@ -61,7 +61,9 @@ JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *
                                                                     jlong j_data,
                                                                     jlong j_data_size,
                                                                     jlong j_validity,
-                                                                    jlong j_validity_size) {
+                                                                    jlong j_validity_size,
+								    jlong j_offsets,
+								    jlong j_offsets_size) {
   // JNI_NULL_CHECK(env, j_data, "data is null", 0);
   // JNI_NULL_CHECK(env, j_validity, "validity is null", 0);
   try {
@@ -70,8 +72,8 @@ JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *
     cudf::type_id n_type = static_cast<cudf::type_id>(j_type);
 
     // is char* ok here?
-    auto null_buffer = arrow::Buffer::Wrap(reinterpret_cast<const char *>(j_validity), static_cast<int>(j_validity_size));
     auto data_buffer = arrow::Buffer::Wrap(reinterpret_cast<const char *>(j_data), static_cast<int>(j_data_size));
+    auto null_buffer = arrow::Buffer::Wrap(reinterpret_cast<const char *>(j_validity), static_cast<int>(j_validity_size));
     // TODO - offset buffer if not null
 	    // bool
 	    // string_view
@@ -80,18 +82,45 @@ JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *
 	    // list_view
 	    // numeric - everything else
     
+    cudf::jni::native_jlongArray outcol_handles(env, 1);
     std::shared_ptr<arrow::Array> arrow_array;
+    auto offsets_buffer = arrow::Buffer::Wrap(reinterpret_cast<const char *>(j_offsets), static_cast<int>(j_offsets_size));
     switch (n_type) {
-      case cudf::type_id::INT32:
+      case cudf::type_id::STRING:
+	// TODO - test empty or no children????
+	arrow_array = std::make_shared<arrow::StringArray>(j_col_length, offsets_buffer, data_buffer, null_buffer, j_null_count);
+	break;
+      default:
         // return std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count)
-        // arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
+        arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
 	// arrow_array = std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count);
 	//
 	// TODO - pass in true number of elements for length
-	arrow_array = std::make_shared<arrow::Int32Array>(20, data_buffer, null_buffer, 0);
+	// arrow_array = std::make_shared<arrow::Int32Array>(j_col_length, data_buffer, null_buffer, j_null_count);
 	break;
-      default: CUDF_FAIL("Unsupported type_id conversion to arrow");
     }
+
+	    /*
+      case cudf::type_id::LIST:
+        long retVal = 101;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
+      case cudf::type_id::BOOL8:
+        long retVal = 102;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
+	*/
+
+	/*
+      case cudf::type_id::STRUCT:
+        long retVal = 100;
+        outcol_handles[0] = reinterpret_cast<jlong>(retVal);
+        return outcol_handles.get_jArray();
+
+
+      case cudf::type_id::DICTIONARY32:
+	break;
+	*/
 
 
     // arrow::Type:type arrow_type = static_cast<arrow::Type::type>(j_arrow_type);
@@ -105,7 +134,6 @@ JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *
     std::vector<std::shared_ptr<arrow::Field>> fields = {f0};
     std::shared_ptr<arrow::Schema> schema = std::make_shared<arrow::Schema>(fields);
     auto arrow_table = arrow::Table::Make(schema, std::vector<std::shared_ptr<arrow::Array>>{arrow_array});
-    cudf::jni::native_jlongArray outcol_handles(env, 1);
     if (arrow_table->num_rows() != j_col_length) {
       long retVal = 4;
       outcol_handles[0] = reinterpret_cast<jlong>(retVal);
@@ -116,9 +144,10 @@ JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *
       outcol_handles[0] = reinterpret_cast<jlong>(retVal);
       return outcol_handles.get_jArray();
     }
-    auto col = arrow_table->column(0);
-    std::vector<int32_t> original_data{23, 40, 20, 33, 41, 39, 24, 24, 44, 45, 41, 45, 21, 32,29,25,26,47, 29, 35};
-    auto arr = std::make_shared<arrow::Int32Array>(20, arrow::Buffer::Wrap(original_data));
+    // auto col = arrow_table->column(0);
+    // std::vector<int32_t> original_data{23, 40, 20, 33, 41, 39, 24, 24, 44, 45, 41, 45, 21, 32,29,25,26,47, 29, 35};
+    // auto arr = std::make_shared<arrow::Int32Array>(20, arrow::Buffer::Wrap(original_data));
+    /*
     if (arr->length() != 20) {
       long retVal = 27;
       outcol_handles[0] = reinterpret_cast<jlong>(retVal);
@@ -157,6 +186,7 @@ JNIEXPORT jlongArray JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *
         return outcol_handles.get_jArray();
       }
     }
+    */
 
     // auto got_cudf_table = cudf::from_arrow(*arrow_table);
         std::unique_ptr<cudf::table> result = cudf::from_arrow(*(arrow_table));

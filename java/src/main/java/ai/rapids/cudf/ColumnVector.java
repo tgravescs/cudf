@@ -56,14 +56,10 @@ public final class ColumnVector extends ColumnView {
    */
   public ColumnVector(long nativePointer) {
     super(getColumnViewFromColumn(nativePointer));
-    log.warn("in create volumn view before native");
     assert nativePointer != 0;
     offHeap = new OffHeapState(nativePointer);
-    log.warn("in create volumn view offheap");
     MemoryCleaner.register(this, offHeap);
-    log.warn("in create volumn cleaner ");
     this.refCount = 0;
-    log.warn("in create volumn refcount");
     incRefCountInternal(true);
   }
 
@@ -202,7 +198,6 @@ public final class ColumnVector extends ColumnView {
    */
   @Override
   public synchronized void close() {
-    log.warn("in close ColumnVEctor");
     refCount--;
     offHeap.delRef();
     if (refCount == 0) {
@@ -338,7 +333,7 @@ public final class ColumnVector extends ColumnView {
     }
     */
     long[] retColHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data,
-         dataLength, validity, validityLength);
+         dataLength, validity, validityLength, offsets, offsetsLength);
     long columnHandle = retColHandle[0];
     log.warn("in from Arrow ColumnVector 19 colhandle: " + columnHandle);
     if (columnHandle == 0) {
@@ -582,7 +577,7 @@ public final class ColumnVector extends ColumnView {
 
   private static native long sequence(long initialValue, long step, int rows);
 
-  private static native long[] fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size) throws CudfException;
+  private static native long[] fromArrow(int type, String col_name, long col_length, long null_count, long data, long data_size, long validity, long validity_size, long offsets, long offsets_size) throws CudfException;
 
   private static native long[] convertArrowTableToCudf(long arrowHandle);
 
@@ -614,12 +609,9 @@ public final class ColumnVector extends ColumnView {
    * be aggregated into a single exception thrown at the end.
    */
   static void closeBuffers(AutoCloseable buffer) {
-    log.warn("in close buffer auto");
     Throwable toThrow = null;
     if (buffer != null) {
-      log.warn("in close buffer auto 2");
       try {
-        log.warn("in close buffer auto 3");
         buffer.close();
       } catch (Throwable t) {
         toThrow = t;

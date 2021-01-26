@@ -75,6 +75,10 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       }
     }
 
+    public void setNullCount(long count) {
+      this.nullCount = count;
+    }
+
     public void setDataBuf(long hdata, long length) {
       this.data = hdata;
       this.dataLength = length;
@@ -106,7 +110,6 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       log.warn("in buildAndPutOnDevice ArrowColVec");
 
 	// TODO - FIGURE OUT ROWS?
-	log.warn("in buildAndPutOnDevice ArrowColVec 2");
         if (offsets == 0) {
           log.warn("offsets is null 2");
         }
@@ -122,7 +125,6 @@ public final class ArrowColumnBuilder implements AutoCloseable {
     @Override
     public void close() {
       // memory buffers owned outside of this
-      log.warn("in close 2 - do nothing");
     }
 
     @Override

@@ -111,7 +111,6 @@ public final class HostColumnVector extends HostColumnVectorCore {
    */
   @Override
   public synchronized void close() {
-    log.warn("in close host column vector");
     refCount--;
     offHeap.delRef();
     if (refCount == 0) {

@@ -65,13 +65,10 @@ public class HostMemoryBuffer extends MemoryBuffer {
     @Override
     protected boolean cleanImpl(boolean logErrorIfNotClean) {
       boolean neededCleanup = false;
-      log.warn("in clean impl host memory buffer addr: " + address);
       long origAddress = address;
       if (address != 0) {
         try {
-          log.warn(" host memory buffer before free");
           UnsafeMemoryAccessor.free(address);
-          log.warn(" host memory buffer after free");
         } finally {
           // Always mark the resource as freed even if an exception is thrown.
           // We cannot know how far it progressed before the exception, and
@@ -107,7 +104,6 @@ public class HostMemoryBuffer extends MemoryBuffer {
       boolean neededCleanup = false;
       if (address != 0) {
         try {
-          log.warn(" host memory buffer munmap");
           HostMemoryBufferNativeUtils.munmap(address, length);
         } finally {
           // Always mark the resource as freed even if an exception is thrown.
@@ -139,7 +135,6 @@ public class HostMemoryBuffer extends MemoryBuffer {
    * @return the newly created buffer
    */
   public static HostMemoryBuffer allocate(long bytes, boolean preferPinned) {
-    log.warn(" host memory buffer allocate");
     if (preferPinned) {
       HostMemoryBuffer pinnedBuffer = PinnedMemoryPool.tryAllocate(bytes);
       if (pinnedBuffer != null) {
@@ -199,13 +194,11 @@ public class HostMemoryBuffer extends MemoryBuffer {
 
   public HostMemoryBuffer(long address, long length, MemoryBufferCleaner cleaner) {
     super(address, length, cleaner);
-    log.warn(" host memory buffer create object addr: " + address);
   }
 
   private HostMemoryBuffer(long address, long lengthInBytes, HostMemoryBuffer parent) {
     super(address, lengthInBytes, parent);
     // This is a slice so we are not going to mark it as allocated
-    log.warn(" host memory buffer create object 2 " + address);
   }
 
   /**

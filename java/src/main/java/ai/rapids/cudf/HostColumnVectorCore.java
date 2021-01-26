@@ -46,8 +46,6 @@ public class HostColumnVectorCore implements AutoCloseable {
   public HostColumnVectorCore(DType type, long rows,
                               Optional<Long> nullCount, HostMemoryBuffer data, HostMemoryBuffer validity,
                               HostMemoryBuffer offsets, List<HostColumnVectorCore> nestedChildren) {
-    log.warn("in HostColumnVectorCore create " + Arrays.toString(Thread.currentThread().getStackTrace()));
-
     this.offHeap = new OffHeapState(data, validity, offsets);
     MemoryCleaner.register(this, offHeap);
     this.type = type;
@@ -518,7 +516,6 @@ public class HostColumnVectorCore implements AutoCloseable {
    */
   @Override
   public void close() {
-    log.warn("host column vector core close");
     for (HostColumnVectorCore child : children) {
       if (child != null) {
         child.close();
@@ -558,7 +555,6 @@ public class HostColumnVectorCore implements AutoCloseable {
 
     @Override
     protected boolean cleanImpl(boolean logErrorIfNotClean) {
-      log.warn("in cleanimpl offheap state");
       boolean neededCleanup = false;
       if (data != null || valid != null || offsets != null) {
         try {
