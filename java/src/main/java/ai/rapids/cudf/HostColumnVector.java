@@ -18,9 +18,6 @@
 
 package ai.rapids.cudf;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -41,7 +38,6 @@ import java.util.function.Consumer;
  * and call incRefCount to increment the reference count.
  */
 public final class HostColumnVector extends HostColumnVectorCore {
-   private static final Logger log = LoggerFactory.getLogger(ColumnVector.class);
   /**
    * The size in bytes of an offset entry
    */
