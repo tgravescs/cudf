@@ -324,10 +324,8 @@ public final class ColumnVector extends ColumnView {
       long validityLength,
       long offsets,
       long offsetsLength) {
-
-    long[] retColHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data,
+    long columnHandle = fromArrow(type.typeId.getNativeId(), col_name, col_length, null_count, data,
          dataLength, validity, validityLength, offsets, offsetsLength);
-    long columnHandle = retColHandle[0];
     ColumnVector vec = new ColumnVector(columnHandle);
     return vec;
   }
@@ -637,7 +635,7 @@ public final class ColumnVector extends ColumnView {
 
   private static native long sequence(long initialValue, long step, int rows);
 
-  private static native long[] fromArrow(int type, String col_name, long col_length,
+  private static native long fromArrow(int type, String col_name, long col_length,
       long null_count, long data, long data_size, long validity, long validity_size,
       long offsets, long offsets_size) throws CudfException;
 
