@@ -41,17 +41,18 @@ public final class ArrowColumnBuilder implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(ArrowColumnBuilder.class);
 
     private DType type;
-    private long data;
-    private long dataLength;
-    private long validity;
-    private long validityLength;
-    private long offsets;
-    private long offsetsLength;
-    private long nullCount = 0l;
+    private ArrayList<Long> data = new ArrayList<>();
+    private ArrayList<Long> dataLength = new ArrayList<>();
+    private ArrayList<Long> validity = new ArrayList<>();
+    private ArrayList<Long> validityLength = new ArrayList<>();
+    private ArrayList<Long> offsets = new ArrayList<>();
+    private ArrayList<Long> offsetsLength = new ArrayList<>();
+    private ArrayList<Long> nullCount = new ArrayList<>();
     //TODO nullable currently not used
     private boolean nullable;
-    private long rows;
-    private long estimatedRows;
+    private int numBatches = 0;
+    private ArrayList<Long> rows = new ArrayList<>();
+    // private long estimatedRows;
     private String colName;
     private boolean built = false;
     private List<ArrowColumnBuilder> childBuilders = new ArrayList<>();
@@ -64,34 +65,48 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       this.type = type.getType();
       this.nullable = type.isNullable();
       this.colName = name;
-      this.rows = 0;
-      this.offsets = 0;
-      this.offsetsLength = 0;
       // TODO - rename estimatedRows to actual unless we do row count
       log.warn("in ArrowColVec colname is: " + name);
-      this.estimatedRows = estimatedRows;
+      // TODO - we don't allocate buffers so don't need estimated rows
+      // this.estimatedRows = estimatedRows;
+      /*
       for (int i = 0; i < type.getNumChildren(); i++) {
         childBuilders.add(new ArrowColumnBuilder(type.getChild(i), estimatedRows, name));
       }
+      */
+    }
+
+    public void addBatch(long rows, long nullCount, long data, long dataLength, long valid, long validLength, long offsets, long offsetsLength) {
+      // TODO - add a class for thsi?
+      log.warn("adding batch with num rows; " + rows + " batches: " + this.numBatches);
+      this.numBatches += 1;
+      this.rows.add(rows);
+      this.nullCount.add(nullCount);
+      this.data.add(data);
+      this.dataLength.add(dataLength);
+      this.validity.add(valid);
+      this.validityLength.add(validLength);
+      this.offsets.add(offsets);
+      this.offsetsLength.add(offsetsLength);
     }
 
     public void setNullCount(long count) {
-      this.nullCount = count;
+      this.nullCount.add(count);
     }
 
     public void setDataBuf(long hdata, long length) {
-      this.data = hdata;
-      this.dataLength = length;
+      this.data.add(hdata);
+      this.dataLength.add(length);
     }
 
     public void setValidityBuf(long valid, long length) {
-      this.validity = valid;
-      this.validityLength = length;
+      this.validity.add(valid);
+      this.validityLength.add(length);
     }
 
     public void setOffsetBuf(long offsets, long length) {
-      this.offsets = offsets;
-      this.offsetsLength= length;
+      this.offsets.add(offsets);
+      this.offsetsLength.add(length);
 	// if (type.equals(DType.LIST) || type.equals(DType.STRING)) {
 	// } else {
           //   throw new Exception("Error shouldn't be setting offset")
@@ -110,11 +125,21 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       log.warn("in buildAndPutOnDevice ArrowColVec");
 
 	// TODO - FIGURE OUT ROWS?
-        if (offsets == 0) {
-          log.warn("offsets is null 2");
-        }
-	log.warn("type before is: " + type + " name is: " + colName);
-        ColumnVector vecRet = ColumnVector.fromArrow(type, colName, estimatedRows, nullCount, data, dataLength, validity, validityLength, offsets, offsetsLength);
+        // if (offsets == 0) {
+          // log.warn("offsets is null 2");
+        // }
+	log.warn("type before is: " + type + " name is: " + colName + " num batches is: " + this.numBatches);
+	ArrayList<ColumnVector> allVecs = new ArrayList<>();
+	for (int i = 0; i < this.numBatches; i++) {
+          ColumnVector vec = ColumnVector.fromArrow(type, colName, rows.get(i), nullCount.get(i), data.get(i), dataLength.get(i), validity.get(i), validityLength.get(i), offsets.get(i), offsetsLength.get(i));
+	  allVecs.add(vec);
+	}
+	// TODO - how do we concatenate multiple batches here?
+	ColumnVector vecRet = allVecs.get(0);
+	if (this.numBatches > 1) {
+	  vecRet = ColumnVector.concatenate(allVecs.toArray(new ColumnVector[0]));
+	}
+ 	
         log.warn("got vec to return type: " + vecRet.getType() + " lenght " + vecRet.getRowCount() + " is int: ");
 	log.warn("back from fromArrow:" + vecRet.toString());
 	
@@ -144,7 +169,7 @@ public final class ArrowColumnBuilder implements AutoCloseable {
           ", offsetsLength=" + offsetsLength+
           ", currentIndex=" + currentIndex +
           ", nullCount=" + nullCount +
-          ", estimatedRows=" + estimatedRows +
+          ", rows=" + rows +
           ", populatedRows=" + rows +
           ", built=" + built +
           '}';
