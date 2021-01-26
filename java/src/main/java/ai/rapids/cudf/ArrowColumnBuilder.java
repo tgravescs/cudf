@@ -69,14 +69,17 @@ public final class ArrowColumnBuilder implements AutoCloseable {
       log.warn("buildAndPutOnDevice type before is: " + type + " name is: " + colName + " num batches is: " + this.numBatches);
       ArrayList<ColumnVector> allVecs = new ArrayList<>();
       for (int i = 0; i < this.numBatches; i++) {
-        ColumnVector vec = ColumnVector.fromArrow(type, colName, rows.get(i), nullCount.get(i),
+        allVecs.add(ColumnVector.fromArrow(type, colName, rows.get(i), nullCount.get(i),
           data.get(i), dataLength.get(i), validity.get(i), validityLength.get(i),
-          offsets.get(i), offsetsLength.get(i));
-	allVecs.add(vec);
+          offsets.get(i), offsetsLength.get(i)));
       }
-      ColumnVector vecRet = allVecs.get(0);
-      if (this.numBatches > 1) {
+      ColumnVector vecRet;
+      if (this.numBatches == 1) {
+        vecRet = allVecs.get(0);
+      } else if (this.numBatches > 1) {
         vecRet = ColumnVector.concatenate(allVecs.toArray(new ColumnVector[0]));
+      } else {
+        throw new IllegalStateException("Can't build a ColumnVector when no Arrow batches specified");
       }
       return vecRet;
     }
