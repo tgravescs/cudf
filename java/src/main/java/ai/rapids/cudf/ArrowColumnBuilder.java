@@ -28,6 +28,9 @@ import java.util.StringJoiner;
 /**
  * Column builder from Arrow data. This builder takes in pointers to the Arrow off heap
  * memory and allows efficient building of CUDF ColumnVectors from that arrow data.
+ * The caller can add multiple batches where each batch corresponds to Arrow data
+ * and those batches get concatenated together after being converted to CUDF
+ * ColumnVectors.
  */
 public final class ArrowColumnBuilder implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(ArrowColumnBuilder.class);

@@ -22,12 +22,12 @@
 #include <cudf/hashing.hpp>
 #include <cudf/reshape.hpp>
 #include <cudf/utilities/bit.hpp>
+#include <cudf/detail/interop.hpp>
 #include <cudf/lists/detail/concatenate.hpp>
 #include <cudf/lists/lists_column_view.hpp>
 #include <cudf/scalar/scalar_factories.hpp>
 #include <cudf/structs/structs_column_view.hpp>
 
-#include "arrow_conversion.hpp"
 #include "cudf_jni_apis.hpp"
 #include "dtype_utils.hpp"
 
@@ -77,11 +77,27 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
     cudf::jni::native_jlongArray outcol_handles(env, 1);
     std::shared_ptr<arrow::Array> arrow_array;
     switch (n_type) {
+      case cudf::type_id::DECIMAL32:
+        JNI_THROW_NEW(env, "java/lang/IllegalArgumentException", "Don't support converting DECIMAL32 yet", 0);
+        break;
+      case cudf::type_id::DECIMAL64:
+        JNI_THROW_NEW(env, "java/lang/IllegalArgumentException", "Don't support converting DECIMAL64 yet", 0);
+        break;
+      case cudf::type_id::STRUCT:
+        JNI_THROW_NEW(env, "java/lang/IllegalArgumentException", "Don't support converting STRUCT yet", 0);
+        break;
+      case cudf::type_id::LIST:
+        JNI_THROW_NEW(env, "java/lang/IllegalArgumentException", "Don't support converting LIST yet", 0);
+        break;
+      case cudf::type_id::DICTIONARY32:
+        JNI_THROW_NEW(env, "java/lang/IllegalArgumentException", "Don't support converting DICTIONARY32 yet", 0);
+        break;
       case cudf::type_id::STRING:
         arrow_array = std::make_shared<arrow::StringArray>(j_col_length, offsets_buffer, data_buffer, null_buffer, j_null_count);
         break;
       default:
-        arrow_array = cudf::java::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
+        // this handles the primitive types
+        arrow_array = cudf::detail::to_arrow_array(n_type, j_col_length, data_buffer, null_buffer, j_null_count);
     }
     cudf::jni::native_jstring col_name(env, j_col_name);
     auto struct_meta = cudf::column_metadata{col_name.get()};
