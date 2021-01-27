@@ -52,7 +52,6 @@ public class ArrowColumnVectorTest extends CudfTestBase {
     int numVecs = 4;
     IntVector[] vectors = new IntVector[numVecs];
     try {
-
       ArrayList<Integer> expectedArr = new ArrayList<Integer>();
       for (int j = 0; j < numVecs; j++) {
 	int pos = 0;
