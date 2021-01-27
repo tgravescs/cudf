@@ -1,6 +1,6 @@
 /*
  *
- *  Copyright (c) 2019-2021, NVIDIA CORPORATION.
+ *  Copyright (c) 2021, NVIDIA CORPORATION.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,9 +21,7 @@ package ai.rapids.cudf;
 import java.util.ArrayList;
 
 import ai.rapids.cudf.HostColumnVector.BasicType;
-import ai.rapids.cudf.HostColumnVector.DataType;
 import ai.rapids.cudf.HostColumnVector.ListType;
-import ai.rapids.cudf.HostColumnVector.StructData;
 import ai.rapids.cudf.HostColumnVector.StructType;
 
 import org.apache.arrow.memory.BufferAllocator;
@@ -31,16 +29,18 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.DateDayVector;
 import org.apache.arrow.vector.DecimalVector;
+import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.Float8Vector;
 import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.complex.ListVector;
+import org.apache.arrow.vector.complex.StructVector;
 import org.apache.arrow.vector.util.Text;
 
 import org.junit.jupiter.api.Test;
 
 import static ai.rapids.cudf.TableTest.assertColumnsAreEqual;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class ArrowColumnVectorTest extends CudfTestBase {
@@ -106,6 +106,66 @@ public class ArrowColumnVectorTest extends CudfTestBase {
       assertEquals(cv.getType(), DType.INT64);
       ColumnVector expected = ColumnVector.fromBoxedLongs(expectedArr.toArray(new Long[0]));
       assertColumnsAreEqual(expected, cv, "Longs");
+    } finally {
+      vector.close();
+    }
+  }
+
+  @Test
+  void testArrowDouble() {
+    ArrowColumnBuilder builder = new ArrowColumnBuilder(new HostColumnVector.BasicType(true, DType.FLOAT64) , "col1");
+    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+    Float8Vector vector = new Float8Vector("vec", allocator);
+    try {
+      ArrayList<Double> expectedArr = new ArrayList<Double>();
+      int count = 10000;
+      for (int i = 0; i < count; i++) {
+        expectedArr.add(new Double(i));
+        ((Float8Vector) vector).setSafe(i, i);
+      }
+      vector.setValueCount(count);
+      long data = vector.getDataBuffer().memoryAddress();
+      long dataLen = vector.getDataBuffer().getActualMemoryConsumed();
+      long valid = vector.getValidityBuffer().memoryAddress();
+      long validLen = vector.getValidityBuffer().getActualMemoryConsumed();
+      builder.addBatch(vector.getValueCount(), vector.getNullCount(), data, dataLen, valid, validLen, 0, 0);
+      ColumnVector cv = builder.buildAndPutOnDevice();
+      assertEquals(cv.getType(), DType.FLOAT64);
+      double[] array = expectedArr.stream().mapToDouble(i->i).toArray();
+      ColumnVector expected = ColumnVector.fromDoubles(array);
+      assertColumnsAreEqual(expected, cv, "doubles");
+    } finally {
+      vector.close();
+    }
+  }
+
+  @Test
+  void testArrowFloat() {
+    ArrowColumnBuilder builder = new ArrowColumnBuilder(new HostColumnVector.BasicType(true, DType.FLOAT32) , "col1");
+    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+    Float4Vector vector = new Float4Vector("vec", allocator);
+    try {
+      ArrayList<Float> expectedArr = new ArrayList<Float>();
+      int count = 10000;
+      for (int i = 0; i < count; i++) {
+        expectedArr.add(new Float(i));
+        ((Float4Vector) vector).setSafe(i, i);
+      }
+      vector.setValueCount(count);
+      long data = vector.getDataBuffer().memoryAddress();
+      long dataLen = vector.getDataBuffer().getActualMemoryConsumed();
+      long valid = vector.getValidityBuffer().memoryAddress();
+      long validLen = vector.getValidityBuffer().getActualMemoryConsumed();
+      builder.addBatch(vector.getValueCount(), vector.getNullCount(), data, dataLen, valid, validLen, 0, 0);
+      ColumnVector cv = builder.buildAndPutOnDevice();
+      assertEquals(cv.getType(), DType.FLOAT32);
+      float[] floatArray = new float[expectedArr.size()];
+      int i = 0;
+      for (Float f : expectedArr) {
+        floatArray[i++] = (f != null ? f : Float.NaN); // Or whatever default you want.
+      }
+      ColumnVector expected = ColumnVector.fromFloats(floatArray);
+      assertColumnsAreEqual(expected, cv, "floats");
     } finally {
       vector.close();
     }
@@ -208,6 +268,48 @@ public class ArrowColumnVectorTest extends CudfTestBase {
       vector.setValueCount(3);
       long data = vector.getDataBuffer().memoryAddress();
       long dataLen = vector.getDataBuffer().getActualMemoryConsumed();
+      long valid = vector.getValidityBuffer().memoryAddress();
+      long validLen = vector.getValidityBuffer().getActualMemoryConsumed();
+
+      builder.addBatch(vector.getValueCount(), vector.getNullCount(), data, dataLen, valid, validLen, 0, 0);
+      assertThrows(IllegalArgumentException.class, () -> {
+        builder.buildAndPutOnDevice();
+      });
+    } finally {
+      vector.close();
+    }
+  }
+
+  @Test
+  void testArrowListThrows() {
+    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+    ListVector vector = ListVector.empty("list", allocator);
+    try {
+      ArrowColumnBuilder builder = new ArrowColumnBuilder(new ListType(true, new HostColumnVector.BasicType(true, DType.STRING)) , "col1");
+      long data = 0;
+      long dataLen = 0;
+      long valid = vector.getValidityBuffer().memoryAddress();
+      long validLen = vector.getValidityBuffer().getActualMemoryConsumed();
+      long offsets = vector.getOffsetBuffer().memoryAddress();
+      long offsetsLen = vector.getOffsetBuffer().getActualMemoryConsumed();
+
+      builder.addBatch(vector.getValueCount(), vector.getNullCount(), data, dataLen, valid, validLen, offsets, offsetsLen);
+      assertThrows(IllegalArgumentException.class, () -> {
+        builder.buildAndPutOnDevice();
+      });
+    } finally {
+      vector.close();
+    }
+  }
+
+  @Test
+  void testArrowStructThrows() {
+    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+    StructVector vector = StructVector.empty("struct", allocator);
+    try {
+      ArrowColumnBuilder builder = new ArrowColumnBuilder(new StructType(true, new HostColumnVector.BasicType(true, DType.STRING)) , "col1");
+      long data = 0;
+      long dataLen = 0;
       long valid = vector.getValidityBuffer().memoryAddress();
       long validLen = vector.getValidityBuffer().getActualMemoryConsumed();
 

@@ -136,7 +136,7 @@
             <groupId>org.apache.arrow</groupId>
             <artifactId>arrow-vector</artifactId>
             <version>${arrow.version}</version>
-	    <scope>test</scope>
+           <scope>test</scope>
         </dependency>
     </dependencies>
 

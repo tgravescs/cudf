@@ -64,7 +64,6 @@ JNIEXPORT jlong JNICALL Java_ai_rapids_cudf_ColumnVector_fromArrow(JNIEnv *env, 
                                                                         jlong j_validity_size,
                                                                         jlong j_offsets,
                                                                         jlong j_offsets_size) {
-  JNI_NULL_CHECK(env, j_data, "data is null", 0);
   try {
     cudf::jni::auto_set_device(env);
     cudf::type_id n_type = static_cast<cudf::type_id>(j_type);
