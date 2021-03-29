@@ -26,8 +26,19 @@ import ai.rapids.cudf.HostColumnVector.BasicType;
 import ai.rapids.cudf.HostColumnVector.DataType;
 import ai.rapids.cudf.HostColumnVector.ListType;
 import ai.rapids.cudf.HostColumnVector.StructType;
+import ai.rapids.cudf.TableTest;
 
 import io.netty.buffer.ArrowBuf;
+
+import java.io.InputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import java.io.ByteArrayInputStream;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.pojo.Schema;
+
+
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.ReferenceManager;
@@ -58,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ColumnVectorToArrowTest extends CudfTestBase {
+
 
   @Test
   void testArrowBool() {
@@ -104,12 +116,85 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
     }
   }
 
+public class ByteBufferBackedInputStream extends InputStream {
+
+    ByteBuffer buf;
+
+    public ByteBufferBackedInputStream(ByteBuffer buf) {
+        this.buf = buf;
+    }
+
+    public int read() throws IOException {
+        if (!buf.hasRemaining()) {
+            return -1;
+        }
+        return buf.get() & 0xFF;
+    }
+
+    public int read(byte[] bytes, int off, int len)
+            throws IOException {
+        if (!buf.hasRemaining()) {
+            return -1;
+        }
+
+        len = Math.min(len, buf.remaining());
+        buf.get(bytes, off, len);
+        return len;
+    }
+}
+
+  private final class MyBufferConsumer implements HostBufferConsumer, AutoCloseable {
+    // public final HostMemoryBuffer buffer;
+    long offset = 0;
+    //public ArrayList<HostMemoryBuffer> buffers = new ArrayList<HostMemoryBuffer>();
+    //public ArrayList<Long> lens = new ArrayList<Long>();
+    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+    // IntVector v1;
+
+    public MyBufferConsumer() {
+      // buffer = HostMemoryBuffer.allocate(10 * 1024 * 1024);
+      // v1 = compareVec;
+    }
+
+    @Override
+    public void handleBuffer(HostMemoryBuffer src, long len) {
+
+/*
+      ByteBufferBackedInputStream outb = new ByteBufferBackedInputStream(src.asByteBuffer());
+      try (ArrowStreamReader reader = new ArrowStreamReader(outb, allocator)) {
+        // Schema schema = reader.getVectorSchemaRoot().getSchema();
+        for (int i = 0; i < 1; i++) {
+          // This will be loaded with new values on every call to loadNextBatch
+          VectorSchemaRoot readBatch = reader.getVectorSchemaRoot();
+          reader.loadNextBatch();
+          IntVector intVector = (IntVector) readBatch.getVector(0);
+          assertEquals(1, intVector.getNullCount());
+          assertTrue(VectorEqualsVisitor.vectorEquals(v1, intVector));
+          assertEquals(2, v1.get(2));
+          assertEquals(2, intVector.get(2));
+          assertEquals(100, v1.get(100));
+          assertEquals(100, intVector.get(100));
+        }
+
+      } catch(IOException e) {
+      }
+*/
+    }
+
+
+    @Override
+    public void close() {
+      // buffer.close();
+    }
+  }
+
+
   @Test
   void testArrowInt() {
     BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
     try (IntVector vector = new IntVector("vec", allocator)) {
       ArrayList<Integer> expectedArr = new ArrayList<Integer>();
-      int count = 10000;
+      int count = 1000000;
       for (int i = 0; i < count; i++) {
         if (i == 3) {
           // add a null in there somewhere
@@ -121,9 +206,52 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
         }
       }
       vector.setValueCount(count);
+
+      DataType listStringsType = new ListType(true, new BasicType(true, DType.STRING));
+      long endWriteTime = 0;
+      long startTime = 0;
+      try (ColumnVector toConvert = ColumnVector.fromBoxedInts(expectedArr.toArray(new Integer[0]));
+           Table table0 = new Table(toConvert)) {
+
+        try (MyBufferConsumer consumer = new MyBufferConsumer()) {
+          ArrowIPCWriterOptions options = ArrowIPCWriterOptions.builder()
+                .withColumnNames("vec")
+                .build();
+           try (TableWriter writer = Table.writeArrowIPCChunked(options, consumer)) {
+            startTime = System.nanoTime();
+            writer.write(table0);
+            endWriteTime = System.nanoTime();
+            assertEquals(endWriteTime - startTime, 1);
+          }
+        }
+        long endTime = System.nanoTime();
+        assertEquals(endTime - startTime, 1);
+      }
+
+    }
+  }
+
+@Test
+  void testArrowInt2() {
+    BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+    try (IntVector vector = new IntVector("vec", allocator)) {
+      ArrayList<Integer> expectedArr = new ArrayList<Integer>();
+      int count = 1000000;
+      for (int i = 0; i < count; i++) {
+        if (i == 3) {
+          // add a null in there somewhere
+          vector.setNull(i);
+          expectedArr.add(null);
+        } else {
+          expectedArr.add(i);
+          ((IntVector) vector).setSafe(i, i);
+        }
+      }
+      vector.setValueCount(count);
+      long startTime = System.nanoTime();
       try (ColumnVector toConvert = ColumnVector.fromBoxedInts(expectedArr.toArray(new Integer[0]));
            ArrowColumnInfo res = ColumnVector.toArrow(toConvert)) {
-        assertEquals(1, toConvert.getNullCount());
+        // assertEquals(1, toConvert.getNullCount());
         ArrowBuf validityBuf = null;
         if (res.getValidityBufferAddress() != 0) {
           validityBuf = new ArrowBuf(ReferenceManager.NO_OP, null,
@@ -134,6 +262,8 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
         ArrowFieldNode fieldNode = new ArrowFieldNode((int)res.getNumRows(), (int)res.getNullCount());
         IntVector v1 = new IntVector("col1", allocator);
         v1.loadFieldBuffers(fieldNode, Stream.of(validityBuf, dataBuf).collect(Collectors.toList()));
+        long endTime = System.nanoTime();
+        assertEquals(endTime - startTime, 1);
         assertEquals(1, v1.getNullCount());
         assertEquals(1, vector.getNullCount());
         assertTrue(VectorEqualsVisitor.vectorEquals(v1, vector));
@@ -146,7 +276,7 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
     BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
     try (BigIntVector vector = new BigIntVector("vec", allocator)) {
       ArrayList<Long> expectedArr = new ArrayList<Long>();
-      int count = 10000;
+      int count = 100000;
       for (int i = 0; i < count; i++) {
         if (i == 3) {
           // add a null in there somewhere
@@ -158,9 +288,10 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
         }
       }
       vector.setValueCount(count);
+      long startTime = System.nanoTime();
       try (ColumnVector toConvert = ColumnVector.fromBoxedLongs(expectedArr.toArray(new Long[0]));
            ArrowColumnInfo res = ColumnVector.toArrow(toConvert)) {
-        assertEquals(toConvert.getNullCount(), 1);
+        // assertEquals(toConvert.getNullCount(), 1);
         ArrowBuf validityBuf = null;
         if (res.getValidityBufferAddress() != 0) {
           validityBuf = new ArrowBuf(ReferenceManager.NO_OP, null,
@@ -171,12 +302,15 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
         ArrowFieldNode fieldNode = new ArrowFieldNode((int)res.getNumRows(), (int)res.getNullCount());
         BigIntVector v1 = new BigIntVector("col1", allocator);
         v1.loadFieldBuffers(fieldNode, Stream.of(validityBuf, dataBuf).collect(Collectors.toList()));
+        long endTime = System.nanoTime();
+        assertEquals(endTime - startTime, 1);
         assertEquals(v1.getNullCount(), 1);
         assertEquals(vector.getNullCount(), 1);
         assertTrue(VectorEqualsVisitor.vectorEquals(v1, vector));
       }
     }
   }
+/*
 
   @Test
   void testArrowDouble() {
@@ -443,4 +577,6 @@ public class ColumnVectorToArrowTest extends CudfTestBase {
       });
     }
   }
+*/
+
 }
