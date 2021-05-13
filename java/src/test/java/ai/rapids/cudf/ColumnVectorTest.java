@@ -2145,6 +2145,31 @@ public class ColumnVectorTest extends CudfTestBase {
     }
   }
 
+  @Test
+  void testStringConcatWsSingleCol() {
+    try (ColumnVector sv1 = ColumnVector.fromStrings("a", "c", "e");
+         ColumnVector sep_col = ColumnVector.fromStrings("-", "-", "-");
+         ColumnVector e_concat = ColumnVector.fromStrings("a", "c", "e");
+         Scalar separatorString = Scalar.fromString(null);
+         Scalar nullEmptyString = Scalar.fromString(null);
+         ColumnVector concat = ColumnVector.stringConcatenateWs(new ColumnView[]{sv1}, sep_col, separatorString, nullEmptyString)) {
+      assertColumnsAreEqual(e_concat, concat);
+    }
+  }
+
+  @Test
+  void testStringConcatWsNullSepNaRep() {
+    try (ColumnVector sv1 = ColumnVector.fromStrings("a", "c", "e");
+         ColumnVector sep_col = ColumnVector.fromStrings("-", "-", "-");
+         ColumnVector e_concat = ColumnVector.fromStrings("a", "c", "e");
+         Scalar separatorString = Scalar.fromString(null);
+         Scalar nullEmptyString = Scalar.fromString(null);
+         ColumnVector concat = ColumnVector.stringConcatenateWs(new ColumnView[]{sv1}, sep_col, separatorString, nullEmptyString)) {
+      assertColumnsAreEqual(e_concat, concat);
+    }
+  }
+
+
   /*
   @Test
   void testStringConcatWsNullValueInArray() {
@@ -2162,7 +2187,7 @@ public class ColumnVectorTest extends CudfTestBase {
 
   @Test
   void testListConcatByRow() {
-    try (ColumnVector cv1 = ColumnVector.fromLists(tListConcatByRowew HostColumnVector.ListType(true,
+    try (ColumnVector cv1 = ColumnVector.fromLists(new HostColumnVector.ListType(true,
             new HostColumnVector.BasicType(true, DType.INT32)),
         Arrays.asList(0), Arrays.asList(1, 2, 3), null, Arrays.asList(), Arrays.asList());
          ColumnVector cv2 = ColumnVector.fromLists(new HostColumnVector.ListType(true,
@@ -3842,7 +3867,8 @@ public class ColumnVectorTest extends CudfTestBase {
   @Test
   void testIsFloat() {
     String[] floatStrings = {"A", "nan", "Inf", "-Inf", "Infinity", "infinity", "-0.0", "0.0",
-        "3.4028235E38", "3.4028236E38", "-3.4028235E38", "-3.4028236E38", "1.2e-24", "NULL", "null", null, "423"};
+        "3.4028235E38", "3.4028236E38", "-3.4028235E38", "-3.4028236E38", "1.2e-24", "NULL", "null",
+        null, "423"};
     try (ColumnVector floatStringCV = ColumnVector.fromStrings(floatStrings);
          ColumnVector isFloat = floatStringCV.isFloat();
          ColumnVector floats = floatStringCV.asFloats();
