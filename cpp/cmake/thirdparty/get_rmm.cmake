@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -12,7 +12,8 @@
 # the License.
 # =============================================================================
 
-# This function finds rmm and applies any needed patches.
+# This function finds rmm, applies any needed patches,  and sets any additional
+# necessary environment variables.
 function(find_and_configure_rmm)
 
   include(${rapids-cmake-dir}/cpm/rmm.cmake)
@@ -21,7 +22,9 @@ function(find_and_configure_rmm)
   set(cudf_patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/patches")
   rapids_cpm_package_override("${cudf_patch_dir}/rmm_override.json")
 
-  rapids_cpm_rmm(BUILD_STATIC)
+  # Find or install RMM
+  rapids_cpm_rmm(BUILD_EXPORT_SET cudf-exports INSTALL_EXPORT_SET cudf-exports)
+
 
 endfunction()
 
