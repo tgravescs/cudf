@@ -1,0 +1,14 @@
+
+{
+  "packages" : {
+    "rmm" : {
+      "patches" : [
+        {
+          "file" : "${current_json_dir}/rmm_ptds_stream_dealloc.diff",
+          "issue" : "Fix Arena MR to support simultaneous access by PTDS and other streams [https://github.com/rapidsai/rmm/pull/1395]",
+          "fixed_in" : ""
+        }
+      ]
+    }
+  }
+}
